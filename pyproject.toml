@@ -4,7 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Otavio Oliveira <https://www.linkedin.com/in/otavioexe/>"]
 readme = "README.md"
-packages = [{include = "databridge", from = "src"}]
+packages = [{include = "datadock", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
