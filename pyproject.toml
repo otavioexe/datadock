@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "datadock"
-version = "0.1.0"
+version = "0.1.2"
 description = ""
 authors = ["Otavio Oliveira <https://www.linkedin.com/in/otavioexe/>"]
 readme = "README.md"
 packages = [{include = "datadock", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = ">=3.9"
 pyspark = "^3.5.5"
 python-dotenv = "^1.1.0"
 loguru = "^0.7.3"
