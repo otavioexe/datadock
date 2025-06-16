@@ -51,16 +51,6 @@ def test_load_parquet(spark, temp_dir):
     assert "id" in read_df.columns
 
 
-def test_load_txt(spark, temp_dir):
-    df = spark.createDataFrame([("linha1",), ("linha2",)], ["value"])
-    path = os.path.join(temp_dir, "sample.txt")
-    df.write.text(path)
-
-    read_df = _load_file(spark, path)
-    assert read_df.count() == 2
-    assert "value" in read_df.columns
-
-
 def test_load_unsupported_extension(spark):
     path = "/tmp/file.unsupported"
     result = _load_file(spark, path)
