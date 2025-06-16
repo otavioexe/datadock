@@ -30,10 +30,6 @@ def _read_schema_only(path: str) -> Optional[List[Tuple[str, str]]]:
             schema = pq.read_schema(path)
             return [(col.name, str(col.type)) for col in schema]
 
-        elif ext == ".txt":
-            # txt as plaintext with a single column called "value"
-            return [("value", "string")]
-
         else:
             logger.warning(f"[WARNING] Unsupported file extension: {ext}")
             return None

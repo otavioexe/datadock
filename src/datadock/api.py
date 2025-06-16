@@ -5,7 +5,7 @@ from datadock._utils import logger
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-SUPPORTED_EXTENSIONS = {".csv", ".json", ".parquet", ".txt"}
+SUPPORTED_EXTENSIONS = {".csv", ".json", ".parquet"}
 
 def scan_schema(path: str):
     """
