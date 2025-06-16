@@ -20,37 +20,48 @@ def _structtype_to_list(schema: StructType) -> List[Tuple[str, str]]:
     return [(field.name, field.dataType.simpleString()) for field in schema]
 
 
-def _group_by_schema(
-    paths: List[str]
-) -> Dict[int, List[Tuple[str, List[Tuple[str, str]]]]]:
+def _group_by_schema(paths: List[str], min_similarity: float = 0.8) -> Dict[int, List[Tuple[str, List[Tuple[str, str]]]]]:
     """
-    Group files by identical schema, independent of file format.
-    Rank schemas by number of columns.
+    Groups files based on schema similarity using only column names.
+    Files are assigned to the first group where the similarity exceeds the given threshold.
+    If no group is similar enough, a new group is created.
 
     Args:
-        paths (List[str]): list of file paths
+        paths (List[str]): 
+            A list of file paths to be analyzed.
+        min_similarity (float, optional): 
+            Minimum similarity ratio (0–1) required to group files together. 
+            Defaults to 0.8.
 
     Returns:
-        Dict[schema_id, List[(path, schema)]] - Groups of schemas with file paths.
+        Dict[int, List[Tuple[str, List[Tuple[str, str]]]]]: 
+            A dictionary mapping each schema ID to a list of tuples, 
+            each containing a file path and its inferred schema.
     """
-    schema_groups = defaultdict(list)
+    schema_groups = {}
+    schema_signatures = {}
+    next_id = 1
 
     for path in paths:
         schema = _read_schema_only(path)
         if schema is None:
-            logger.warning(f"Could not read dataset schema at path: {path}")
+            logger.warning(f"Could not read schema for file: {path}")
             continue
 
-        schema_sig = _extract_schema_signature(schema)
-        schema_groups[schema_sig].append((path, schema))
+        matched = False
+        for schema_id, ref_schema in schema_signatures.items():
+            sim = _schema_similarity(schema, ref_schema)
+            if sim >= min_similarity:
+                schema_groups[schema_id].append((path, schema))
+                matched = True
+                break
 
-    ranked_schemas = sorted(schema_groups.items(), key=lambda x: len(x[0]), reverse=True)
+        if not matched:
+            schema_signatures[next_id] = schema
+            schema_groups[next_id] = [(path, schema)]
+            next_id += 1
 
-    grouped_by_id = {}
-    for schema_id, (schema_sig, items) in enumerate(ranked_schemas, start=1):
-        grouped_by_id[schema_id] = items
-
-    return grouped_by_id
+    return schema_groups
 
 
 def _read_schema_group(
@@ -81,3 +92,24 @@ def _read_schema_group(
     logger.info(f"Selected dataset from schema group {selected_id}.")
 
     return [path for path, _ in grouped_by_id[selected_id]]
+
+def _schema_similarity(a: List[Tuple[str, str]], b: List[Tuple[str, str]]) -> float:
+    """
+    Calculates the similarity between two schemas based on column names only,
+    ignoring data types. Uses Jaccard similarity.
+
+    Args:
+        a (List[Tuple[str, str]]): 
+            Schema A as a list of (column name, data type) tuples.
+        b (List[Tuple[str, str]]): 
+            Schema B as a list of (column name, data type) tuples.
+
+    Returns:
+        float: 
+            A value between 0.0 and 1.0 representing the schema similarity.
+    """
+    set_a = set(col_name for col_name, _ in a)
+    set_b = set(col_name for col_name, _ in b)
+    intersection = set_a & set_b
+    union = set_a | set_b
+    return len(intersection) / len(union) if union else 0

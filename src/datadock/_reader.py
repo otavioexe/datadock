@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Optional, List, Tuple
 import pyarrow.parquet as pq
-from fastavro import reader
 from datadock._utils import logger
 
 def _read_schema_only(path: str) -> Optional[List[Tuple[str, str]]]:

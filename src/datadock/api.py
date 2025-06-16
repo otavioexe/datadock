@@ -3,7 +3,7 @@ from datadock._schema_manager import _group_by_schema, _read_schema_group
 from datadock._reader import _load_file
 from datadock._utils import logger
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 SUPPORTED_EXTENSIONS = {".csv", ".json", ".parquet", ".txt"}
 
@@ -103,3 +103,34 @@ def read_data(path: str, schema_id: Optional[int] = None, logs: bool = False) ->
         logger.info("Dataset successfully loaded.")
 
     return final_df
+
+
+def get_schema_info(path: str) -> List[Dict[str, Any]]:
+    """
+    Returns detailed information about schema groups detected in the given directory.
+
+    :param path: Path to the folder containing raw data files.
+    :return: A list of dictionaries with schema_id, file count, column count, and list of files.
+    """
+    data_dir = Path(path)
+    paths = [str(p) for p in data_dir.glob("*") if p.suffix.lower() in SUPPORTED_EXTENSIONS]
+
+    if not paths:
+        logger.warning("No supported data files found in the provided directory.")
+        return []
+
+    grouped = _group_by_schema(paths)
+    schema_info = []
+
+    for schema_id, group in grouped.items():
+        file_list = [Path(file_path).name for file_path, _ in group]
+        column_count = len(group[0][1]) if group else 0
+
+        schema_info.append({
+            "schema_id": schema_id,
+            "file_count": len(file_list),
+            "column_count": column_count,
+            "files": file_list
+        })
+
+    return schema_info
