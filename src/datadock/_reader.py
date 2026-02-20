@@ -6,6 +6,46 @@ from typing import Optional, List, Tuple
 import pyarrow.parquet as pq
 from datadock._utils import logger
 
+CSV_CANDIDATE_DELIMITERS = [",", ";", "\t", "|", ":"]
+
+
+def _resolve_csv_source(path: str) -> Optional[Path]:
+    """
+    Resolve the real file used to inspect CSV content.
+    Supports plain files and Spark output directories.
+    """
+    source = Path(path)
+    if source.is_file():
+        return source
+
+    if source.is_dir():
+        for file in sorted(source.iterdir()):
+            if file.is_file() and not file.name.startswith((".", "_")):
+                return file
+
+    return None
+
+
+def _detect_csv_delimiter(path: str) -> str:
+    """
+    Detect delimiter from a sample CSV file. Falls back to comma.
+    """
+    source = _resolve_csv_source(path)
+    if source is None:
+        return ","
+
+    try:
+        with open(source, encoding="utf-8", newline="") as f:
+            sample = f.read(8192)
+            if not sample.strip():
+                return ","
+
+            dialect = csv.Sniffer().sniff(sample, delimiters="".join(CSV_CANDIDATE_DELIMITERS))
+            return dialect.delimiter
+    except Exception:
+        return ","
+
+
 def _read_schema_only(path: str) -> Optional[List[Tuple[str, str]]]:
     """
     Reads only the schema (field names and types) from a file without loading data.
@@ -14,8 +54,13 @@ def _read_schema_only(path: str) -> Optional[List[Tuple[str, str]]]:
 
     try:
         if ext == ".csv":
-            with open(path, newline='', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
+            source = _resolve_csv_source(path)
+            if source is None:
+                return None
+
+            delimiter = _detect_csv_delimiter(path)
+            with open(source, newline='', encoding='utf-8') as f:
+                reader = csv.DictReader(f, delimiter=delimiter)
                 columns = reader.fieldnames
                 if columns:
                     return [(col, "string") for col in columns]
@@ -54,7 +99,8 @@ def _load_file(spark: SparkSession, file: str) -> Optional[DataFrame]:
 
     try:
         if ext == ".csv":
-            return spark.read.option("header", True).csv(file)
+            delimiter = _detect_csv_delimiter(file)
+            return spark.read.option("header", True).option("sep", delimiter).csv(file)
         elif ext == ".json":
             return spark.read.option("multiline", True).json(file)
         elif ext == ".parquet":

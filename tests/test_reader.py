@@ -1,7 +1,7 @@
 import os
 import pytest
 from pyspark.sql import SparkSession
-from datadock._reader import _load_file
+from datadock._reader import _load_file, _read_schema_only
 
 
 @pytest.fixture(scope="session")
@@ -29,6 +29,19 @@ def test_load_csv(spark, temp_dir):
     read_df = _load_file(spark, path)
     assert read_df.count() == 2
     assert set(read_df.columns) == {"name", "id"}
+
+
+def test_load_csv_semicolon(spark, temp_dir):
+    path = os.path.join(temp_dir, "sample_semicolon.csv")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("name;id\nAlice;1\nBob;2\n")
+
+    read_df = _load_file(spark, path)
+    assert read_df.count() == 2
+    assert set(read_df.columns) == {"name", "id"}
+
+    schema = _read_schema_only(path)
+    assert schema == [("name", "string"), ("id", "string")]
 
 
 def test_load_json(spark, temp_dir):

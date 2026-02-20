@@ -1,0 +1,71 @@
+name: Publish
+
+on:
+  push:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Read package metadata
+        id: metadata
+        run: |
+          echo "name=$(poetry version | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "version=$(poetry version --short)" >> "$GITHUB_OUTPUT"
+
+      - name: Check version on PyPI
+        id: check_pypi
+        env:
+          PACKAGE_NAME: ${{ steps.metadata.outputs.name }}
+          PACKAGE_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          python - <<'PY'
+          import os
+          import urllib.error
+          import urllib.request
+
+          name = os.environ["PACKAGE_NAME"]
+          version = os.environ["PACKAGE_VERSION"]
+          url = f"https://pypi.org/pypi/{name}/{version}/json"
+          exists = False
+
+          try:
+              with urllib.request.urlopen(url, timeout=10) as response:
+                  exists = response.status == 200
+          except urllib.error.HTTPError as exc:
+              if exc.code != 404:
+                  raise
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"exists={'true' if exists else 'false'}\n")
+          PY
+
+      - name: Publish to PyPI
+        if: steps.check_pypi.outputs.exists != 'true'
+        env:
+          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
+        run: poetry publish --build --no-interaction
+
+      - name: Version already published
+        if: steps.check_pypi.outputs.exists == 'true'
+        run: echo "Version ${{ steps.metadata.outputs.version }} already exists on PyPI. Skipping publish."
