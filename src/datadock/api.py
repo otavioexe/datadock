@@ -8,6 +8,19 @@ from typing import Optional, List, Dict, Any
 SUPPORTED_EXTENSIONS = {".csv", ".json", ".parquet"}
 
 
+def _normalize_path(path: str) -> str:
+    """
+    Normalizes Databricks DBFS paths to the local FUSE mount format.
+    Converts 'dbfs:/path' and 'dbfs://path' to '/dbfs/path'.
+    All other paths are returned unchanged.
+    """
+    if path.startswith("dbfs://"):
+        return "/dbfs/" + path[len("dbfs://"):]
+    if path.startswith("dbfs:/"):
+        return "/dbfs/" + path[len("dbfs:/"):]
+    return path
+
+
 def _collect_paths(data_dir: Path, recursive: bool) -> List[str]:
     pattern = "**/*" if recursive else "*"
     return [
@@ -26,6 +39,7 @@ def scan_schema(path: str, min_similarity: float = 0.8, recursive: bool = False)
     :param recursive: Whether to scan subdirectories recursively. Defaults to False.
     :return: List of dicts with schema_id, file_count, column_count, and files.
     """
+    path = _normalize_path(path)
     data_dir = Path(path)
     if not data_dir.exists():
         logger.error(f"Path does not exist: {path}")
@@ -70,6 +84,7 @@ def read_data(
     if spark is None:
         spark = SparkSession.builder.appName("Datadock").getOrCreate()
 
+    path = _normalize_path(path)
     data_dir = Path(path)
     if not data_dir.exists():
         logger.error(f"Path does not exist: {path}")
@@ -142,6 +157,7 @@ def get_schema_info(path: str, min_similarity: float = 0.8, recursive: bool = Fa
     :param recursive: Whether to scan subdirectories recursively. Defaults to False.
     :return: A list of dictionaries with schema_id, file count, column count, and list of files.
     """
+    path = _normalize_path(path)
     data_dir = Path(path)
     if not data_dir.exists():
         logger.error(f"Path does not exist: {path}")
