@@ -1,23 +1,7 @@
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.types import StructType
 from datadock._reader import _read_schema_only
 from datadock._utils import logger
 from typing import List, Dict, Optional, Tuple
-from collections import defaultdict
 from pathlib import Path
-
-
-def _extract_schema_signature(schema: List[Tuple[str, str]]) -> Tuple[str, ...]:
-    """
-    Create a normalized schema signature: tuple of (column_name, type), sorted by column name.
-    """
-    return tuple(sorted((col, dtype) for col, dtype in schema))
-
-def _structtype_to_list(schema: StructType) -> List[Tuple[str, str]]:
-    """
-    Convert a Spark StructType schema to a list of (column_name, data_type) tuples.
-    """
-    return [(field.name, field.dataType.simpleString()) for field in schema]
 
 
 def _group_by_schema(paths: List[str], min_similarity: float = 0.8) -> Dict[int, List[Tuple[str, List[Tuple[str, str]]]]]:
@@ -76,8 +60,8 @@ def _read_schema_group(
         grouped_by_id (Dict[int, List[Tuple[str, List[Tuple[str, str]]]]]): 
             A dictionary where the key is the schema ID and the value is a list of tuples 
             containing file paths and their associated schema.
-        schema_id (Optional[int]): 
-            The schema ID to retrieve. If not specified, defaults to the group with the most columns.
+        schema_id (Optional[int]):
+            The schema ID to retrieve. If not specified, defaults to the group with the lowest ID (first detected).
 
     Returns:
         Optional[List[str]]: 

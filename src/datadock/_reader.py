@@ -67,9 +67,25 @@ def _read_schema_only(path: str) -> Optional[List[Tuple[str, str]]]:
 
         elif ext == ".json":
             with open(path, encoding='utf-8') as f:
-                line = json.loads(f.readline())
-                if isinstance(line, dict):
-                    return [(key, "string") for key in line.keys()]
+                first_line = f.readline().strip()
+                if not first_line:
+                    return None
+
+                # Fast path: JSONL (one object per line)
+                try:
+                    parsed = json.loads(first_line)
+                    if isinstance(parsed, dict):
+                        return [(key, "string") for key in parsed.keys()]
+                except json.JSONDecodeError:
+                    pass
+
+                # Slow path: multi-line JSON object or array
+                f.seek(0)
+                parsed = json.loads(f.read())
+                if isinstance(parsed, dict):
+                    return [(key, "string") for key in parsed.keys()]
+                if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
+                    return [(key, "string") for key in parsed[0].keys()]
 
         elif ext == ".parquet":
             schema = pq.read_schema(path)
@@ -105,8 +121,6 @@ def _load_file(spark: SparkSession, file: str) -> Optional[DataFrame]:
             return spark.read.option("multiline", True).json(file)
         elif ext == ".parquet":
             return spark.read.parquet(file)
-        elif ext == ".txt":
-            return spark.read.text(file)
         else:
             logger.warning(f"Unsupported file format: {ext}")
             return None
