@@ -159,3 +159,75 @@ def test_scan_schema_with_min_similarity_does_not_raise(temp_dir):
     _write_csv(os.path.join(temp_dir, "a.csv"), "id,name", "1,Alice")
     _write_csv(os.path.join(temp_dir, "b.csv"), "id,name,age", "1,Alice,30")
     scan_schema(temp_dir, min_similarity=0.9)  # should not raise
+
+
+def test_scan_schema_returns_same_structure_as_get_schema_info(temp_dir):
+    _write_csv(os.path.join(temp_dir, "a.csv"), "id,name", "1,Alice")
+    _write_csv(os.path.join(temp_dir, "b.csv"), "city,country", "SP,BR")
+
+    scan_result = scan_schema(temp_dir)
+    info_result = get_schema_info(temp_dir)
+
+    assert scan_result == info_result
+
+
+def test_scan_schema_nonexistent_path_returns_empty_list():
+    result = scan_schema("/nonexistent/path/xyz")
+    assert result == []
+
+
+# ---------------------------------------------------------------------------
+# nonexistent path
+# ---------------------------------------------------------------------------
+
+def test_read_data_nonexistent_path_returns_none(spark):
+    result = read_data("/nonexistent/path/xyz", spark=spark)
+    assert result is None
+
+
+def test_get_schema_info_nonexistent_path_returns_empty_list():
+    result = get_schema_info("/nonexistent/path/xyz")
+    assert result == []
+
+
+# ---------------------------------------------------------------------------
+# recursive scanning
+# ---------------------------------------------------------------------------
+
+def test_read_data_recursive_finds_nested_files(spark, temp_dir):
+    subdir = os.path.join(temp_dir, "subdir")
+    os.makedirs(subdir)
+    _write_csv(os.path.join(temp_dir, "a.csv"), "id,name", "1,Alice")
+    _write_csv(os.path.join(subdir, "b.csv"), "id,name", "2,Bob")
+
+    df_non_recursive = read_data(temp_dir, spark=spark, recursive=False)
+    df_recursive = read_data(temp_dir, spark=spark, recursive=True)
+
+    assert df_non_recursive.count() == 1
+    assert df_recursive.count() == 2
+
+
+def test_get_schema_info_recursive_finds_nested_files(temp_dir):
+    subdir = os.path.join(temp_dir, "subdir")
+    os.makedirs(subdir)
+    _write_csv(os.path.join(temp_dir, "a.csv"), "id,name", "1,Alice")
+    _write_csv(os.path.join(subdir, "b.csv"), "id,name", "2,Bob")
+
+    info_flat = get_schema_info(temp_dir, recursive=False)
+    info_recursive = get_schema_info(temp_dir, recursive=True)
+
+    assert info_flat[0]["file_count"] == 1
+    assert info_recursive[0]["file_count"] == 2
+
+
+def test_scan_schema_recursive_finds_nested_files(temp_dir):
+    subdir = os.path.join(temp_dir, "subdir")
+    os.makedirs(subdir)
+    _write_csv(os.path.join(temp_dir, "a.csv"), "id,name", "1,Alice")
+    _write_csv(os.path.join(subdir, "b.csv"), "id,name", "2,Bob")
+
+    result_flat = scan_schema(temp_dir, recursive=False)
+    result_recursive = scan_schema(temp_dir, recursive=True)
+
+    assert result_flat[0]["file_count"] == 1
+    assert result_recursive[0]["file_count"] == 2

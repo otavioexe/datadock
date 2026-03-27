@@ -60,8 +60,8 @@ def _read_schema_group(
         grouped_by_id (Dict[int, List[Tuple[str, List[Tuple[str, str]]]]]): 
             A dictionary where the key is the schema ID and the value is a list of tuples 
             containing file paths and their associated schema.
-        schema_id (Optional[int]): 
-            The schema ID to retrieve. If not specified, defaults to the group with the most columns.
+        schema_id (Optional[int]):
+            The schema ID to retrieve. If not specified, defaults to the group with the lowest ID (first detected).
 
     Returns:
         Optional[List[str]]: 
