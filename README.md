@@ -138,6 +138,7 @@ read_data("/dbfs/mnt/bronze/sales", spark=spark)
 > | DBFS native prefix | `dbfs:/mnt/...` | ✅ Available |
 > | DBFS double-slash prefix | `dbfs://mnt/...` | ✅ Available |
 > | DBFS FUSE mount | `/dbfs/mnt/...` | ✅ Available |
+> | Unity Catalog Volumes | `/Volumes/catalog/schema/volume/...` | ✅ Available |
 > | Local filesystem | `/local/path/...` | ✅ Available |
 > | Azure Data Lake (ADLS) | `abfss://container@...` | 🔜 Coming soon |
 > | AWS S3 | `s3://bucket/...` | 🔜 Coming soon |
