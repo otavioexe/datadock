@@ -1,5 +1,7 @@
 # Datadock
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/otavioexe/datadock)
+
 **Datadock** is a Python library built on top of PySpark, designed to simplify **data interoperability** between files of different formats and schemas in modern data engineering pipelines.
 
 It automatically detects schemas from CSV, JSON and Parquet files, groups structurally similar files, and allows standardized reading of all grouped files into a single Spark DataFrame — even in highly heterogeneous datasets.
