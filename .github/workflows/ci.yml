@@ -9,6 +9,12 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pyspark-version: ["3.5.5", "4.0.0", "4.1.0"]
+      fail-fast: false
+
+    name: Test (PySpark ${{ matrix.pyspark-version }})
 
     steps:
       - name: Checkout
@@ -37,10 +43,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .venv
-          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('poetry.lock') }}
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-pyspark${{ matrix.pyspark-version }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
         run: poetry install --no-interaction
+
+      - name: Override PySpark version
+        run: poetry run pip install "pyspark==${{ matrix.pyspark-version }}"
 
       - name: Run tests
         run: poetry run pytest -q
