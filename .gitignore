@@ -4,3 +4,4 @@ __pycache__/
 .mypy_cache/
 .venv/
 .DS_Store
+CHANGELOG.md

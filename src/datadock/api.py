@@ -7,10 +7,13 @@ from typing import Optional, List, Dict, Any
 
 SUPPORTED_EXTENSIONS = {".csv", ".json", ".parquet"}
 
-def scan_schema(path: str):
+def scan_schema(path: str, min_similarity: float = 0.8):
     """
     Scans and prints schema groupings for all supported files in the specified path.
     This is the public entry point for schema inspection.
+
+    :param path: Folder containing data files
+    :param min_similarity: Minimum Jaccard similarity (0–1) to group files together. Defaults to 0.8.
     """
     data_dir = Path(path)
     paths = [str(p) for p in data_dir.glob("*") if p.suffix.lower() in SUPPORTED_EXTENSIONS]
@@ -20,7 +23,7 @@ def scan_schema(path: str):
         return
 
     logger.info(f"Found {len(paths)} files to process.")
-    grouped = _group_by_schema(paths)
+    grouped = _group_by_schema(paths, min_similarity=min_similarity)
 
     if len(grouped) > 1:
         logger.info(f"Found {len(grouped)} different schemas.")
@@ -33,16 +36,19 @@ def scan_schema(path: str):
         for file_path, _ in group:
             logger.info(f"  • {file_path}")
 
-def read_data(path: str, schema_id: Optional[int] = None, logs: bool = False) -> Optional[DataFrame]:
+def read_data(path: str, schema_id: Optional[int] = None, logs: bool = False, spark: Optional[SparkSession] = None, min_similarity: float = 0.8) -> Optional[DataFrame]:
     """
     Reads and merges all files that belong to a schema group.
 
     :param path: Folder containing data files
     :param schema_id: ID of the schema group to read (defaults to most complex)
     :param logs: Whether to print detailed logs during loading
+    :param spark: Active SparkSession to use. If not provided, gets or creates one.
+    :param min_similarity: Minimum Jaccard similarity (0–1) to group files together. Defaults to 0.8.
     :return: Spark DataFrame or None if load failed
     """
-    spark = SparkSession.builder.appName("Databridge").getOrCreate()
+    if spark is None:
+        spark = SparkSession.builder.appName("Datadock").getOrCreate()
 
     data_dir = Path(path)
     paths = [str(p) for p in data_dir.glob("*") if p.suffix.lower() in SUPPORTED_EXTENSIONS]
@@ -53,9 +59,7 @@ def read_data(path: str, schema_id: Optional[int] = None, logs: bool = False) ->
 
     if logs:
         logger.info(f"Found {len(paths)} files to process.")
-    elif logs == False:
-        logger.info(f"For more details about the reading process, set `logs=True`.")
-    grouped = _group_by_schema(paths)
+    grouped = _group_by_schema(paths, min_similarity=min_similarity)
 
     if len(grouped) > 1 and logs:
         logger.warning(f"Multiple schemas found in path '{path}'. Total: {len(grouped)}")
@@ -94,10 +98,10 @@ def read_data(path: str, schema_id: Optional[int] = None, logs: bool = False) ->
     final_df = dfs[0]
     for df in dfs[1:]:
         try:
-            final_df = final_df.unionByName(df)
+            final_df = final_df.unionByName(df, allowMissingColumns=True)
         except Exception as e:
-            if logs:
-                logger.error(f"Error merging DataFrames: {e}")
+            logger.error(f"Error merging DataFrames: {e}")
+            return None
 
     if logs:
         logger.info("Dataset successfully loaded.")
@@ -105,11 +109,12 @@ def read_data(path: str, schema_id: Optional[int] = None, logs: bool = False) ->
     return final_df
 
 
-def get_schema_info(path: str) -> List[Dict[str, Any]]:
+def get_schema_info(path: str, min_similarity: float = 0.8) -> List[Dict[str, Any]]:
     """
     Returns detailed information about schema groups detected in the given directory.
 
     :param path: Path to the folder containing raw data files.
+    :param min_similarity: Minimum Jaccard similarity (0–1) to group files together. Defaults to 0.8.
     :return: A list of dictionaries with schema_id, file count, column count, and list of files.
     """
     data_dir = Path(path)
@@ -119,7 +124,7 @@ def get_schema_info(path: str) -> List[Dict[str, Any]]:
         logger.warning("No supported data files found in the provided directory.")
         return []
 
-    grouped = _group_by_schema(paths)
+    grouped = _group_by_schema(paths, min_similarity=min_similarity)
     schema_info = []
 
     for schema_id, group in grouped.items():
