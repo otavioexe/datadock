@@ -1,24 +1,7 @@
 import os
+import json
 import pytest
-from pyspark.sql import SparkSession
 from datadock._reader import _load_file, _read_schema_only
-
-
-@pytest.fixture(scope="session")
-def spark():
-    spark = (
-        SparkSession.builder
-        .appName("DatadockTest")
-        .master("local[*]")
-        .getOrCreate()
-    )
-    yield spark
-    spark.stop()
-
-
-@pytest.fixture
-def temp_dir(tmp_path):
-    return str(tmp_path)
 
 
 def test_load_csv(spark, temp_dir):
@@ -66,5 +49,109 @@ def test_load_parquet(spark, temp_dir):
 
 def test_load_unsupported_extension(spark):
     path = "/tmp/file.unsupported"
+    result = _load_file(spark, path)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _read_schema_only — JSON new scenarios
+# ---------------------------------------------------------------------------
+
+def test_read_schema_only_json_multiline(temp_dir):
+    path = os.path.join(temp_dir, "multiline.json")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write('{\n  "id": 1,\n  "name": "Alice",\n  "city": "SP"\n}')
+
+    schema = _read_schema_only(path)
+    assert schema is not None
+    assert set(col for col, _ in schema) == {"id", "name", "city"}
+
+
+def test_read_schema_only_json_array(temp_dir):
+    path = os.path.join(temp_dir, "array.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump([{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}], f)
+
+    schema = _read_schema_only(path)
+    assert schema is not None
+    assert set(col for col, _ in schema) == {"id", "name"}
+
+
+def test_read_schema_only_json_empty_file(temp_dir):
+    path = os.path.join(temp_dir, "empty.json")
+    open(path, "w").close()
+
+    result = _read_schema_only(path)
+    assert result is None
+
+
+def test_read_schema_only_json_array_empty(temp_dir):
+    path = os.path.join(temp_dir, "empty_array.json")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("[]")
+
+    result = _read_schema_only(path)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _read_schema_only — CSV edge cases
+# ---------------------------------------------------------------------------
+
+def test_read_schema_only_csv_header_only(temp_dir):
+    path = os.path.join(temp_dir, "header_only.csv")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("id,name,age\n")
+
+    schema = _read_schema_only(path)
+    assert schema == [("id", "string"), ("name", "string"), ("age", "string")]
+
+
+def test_read_schema_only_csv_pipe_delimiter(temp_dir):
+    path = os.path.join(temp_dir, "pipe.csv")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("id|name|city\n1|Alice|SP\n2|Bob|RJ\n")
+
+    schema = _read_schema_only(path)
+    assert schema is not None
+    assert set(col for col, _ in schema) == {"id", "name", "city"}
+
+
+def test_read_schema_only_csv_tab_delimiter(temp_dir):
+    path = os.path.join(temp_dir, "tab.csv")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("id\tname\tcountry\n1\tAlice\tBR\n")
+
+    schema = _read_schema_only(path)
+    assert schema is not None
+    assert set(col for col, _ in schema) == {"id", "name", "country"}
+
+
+def test_read_schema_only_nonexistent_file(temp_dir):
+    path = os.path.join(temp_dir, "does_not_exist.csv")
+    result = _read_schema_only(path)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _load_file — edge cases
+# ---------------------------------------------------------------------------
+
+def test_load_csv_header_only_returns_empty_dataframe(spark, temp_dir):
+    path = os.path.join(temp_dir, "header_only.csv")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("id,name,age\n")
+
+    df = _load_file(spark, path)
+    assert df is not None
+    assert df.count() == 0
+    assert set(df.columns) == {"id", "name", "age"}
+
+
+def test_load_txt_file_returns_none(spark, temp_dir):
+    path = os.path.join(temp_dir, "notes.txt")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("hello world\nfoo bar\n")
+
     result = _load_file(spark, path)
     assert result is None

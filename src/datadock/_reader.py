@@ -121,8 +121,6 @@ def _load_file(spark: SparkSession, file: str) -> Optional[DataFrame]:
             return spark.read.option("multiline", True).json(file)
         elif ext == ".parquet":
             return spark.read.parquet(file)
-        elif ext == ".txt":
-            return spark.read.text(file)
         else:
             logger.warning(f"Unsupported file format: {ext}")
             return None
